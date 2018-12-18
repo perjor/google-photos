@@ -28,10 +28,13 @@ const session = require('express-session');
 const sessionFileStore = require('session-file-store');
 const uuid = require('uuid');
 const winston = require('winston');
+const fileUpload = require('express-fileupload');
 
 const app = express();
 const fileStore = sessionFileStore(session);
 const server = http.Server(app);
+
+app.use(fileUpload());
 
 // Use the EJS template engine
 app.set('view engine', 'ejs');
@@ -372,11 +375,90 @@ app.get('/getQueue', async (req, res) => {
   }
 });
 
+app.get('/uploadPhoto', (req, res) => {
+  renderIfAuthenticated(req, res, 'pages/upload-photo');
+});
+
+app.post('/uploadPhoto', async (req, res) => {
+  if (Object.keys(req.files).length == 0) {
+    return res.status(400).send('No files were uploaded.');
+  }
+  const file = req.files.photo;
+  console.log(file);
+  
+  // const userId = req.user.profile.id;
+  const authToken = req.user.token;
+  const filename = file.name
+  const fileBinary = file.data.toString('binary')
+  // console.log(fileBinary);
+  
+
+  logger.info(`Uploading file: ${filename}`);
+
+
+  // Options to request the upload Token
+  const options = {
+    method: 'POST',
+    uri: config.apiEndpoint + '/v1/uploads',
+    body: {
+      MEDIA_BINARY_DATA: fileBinary
+    },
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'X-Goog-Upload-File-Name': filename,
+      'X-Goog-Upload-Protocol': 'raw'  
+    },
+    auth: {'bearer': authToken},
+    json: true
+  }
+
+  try {
+    const upload_token = await request.post(options);
+
+    // Options to upload the file with the upload token
+    const options2 = {
+      method: 'POST',
+      uri: config.apiEndpoint + '/v1/mediaItems:batchCreate',
+      body: {
+        "newMediaItems": [
+          {
+            "description": 'Upload Image',
+            "simpleMediaItem": {
+              "uploadToken": upload_token
+            }
+          }
+         ,
+        ]
+      },
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      auth: {'bearer': authToken},
+      json: true
+    }
+    logger.info(`Received Token`);
+    try {
+      const result2 = await request.post(options2);
+      logger.info(`Uploaded Media file`);
+      res.status(200).send(result2);      
+    } catch (error) {
+      logger.info(`Failed Uploading Media file`);
+      console.log(error);
+      
+      res.status(500).send(error);      
+    }
+    
+  } catch (error) {
+    console.log('error');
+  }
+
+});
+
 
 
 // Start the server
 server.listen(config.port, () => {
-  console.log(`App listening on port ${config.port}`);
+  console.log(`App listening on http://localhost:${config.port}`);
   console.log('Press Ctrl+C to quit.');
 });
 
