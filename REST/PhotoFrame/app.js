@@ -29,6 +29,7 @@ const sessionFileStore = require('session-file-store');
 const uuid = require('uuid');
 const winston = require('winston');
 const fileUpload = require('express-fileupload');
+const axios = require('axios');
 
 const app = express();
 const fileStore = sessionFileStore(session);
@@ -389,27 +390,22 @@ app.post('/uploadPhoto', async (req, res) => {
   // const userId = req.user.profile.id;
   const authToken = req.user.token;
   const filename = file.name
-  const fileBinary = file.data.toString('binary')
-  // console.log(fileBinary);
   
 
   logger.info(`Uploading file: ${filename}`);
-
+  
 
   // Options to request the upload Token
   const options = {
     method: 'POST',
     uri: config.apiEndpoint + '/v1/uploads',
-    body: {
-      MEDIA_BINARY_DATA: fileBinary
-    },
+    body: file.data,
     headers: {
       'Content-Type': 'application/octet-stream',
       'X-Goog-Upload-File-Name': filename,
       'X-Goog-Upload-Protocol': 'raw'  
     },
     auth: {'bearer': authToken},
-    json: true
   }
 
   try {
@@ -449,7 +445,9 @@ app.post('/uploadPhoto', async (req, res) => {
     }
     
   } catch (error) {
-    console.log('error');
+    // res.status(500).send(error); 
+    console.log(error);
+         
   }
 
 });
